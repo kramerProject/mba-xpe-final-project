@@ -16,11 +16,12 @@ s3_client = boto3.client(
 )
 
 
-def downloader():
+
+def downloader(reference):
     try:
         os.makedirs(static.FUNDS_FOLDER, exist_ok=True)
         file_bytes = BytesIO(
-            requests.get(static.DOWNLOAD_URL, verify=False).content
+            requests.get(static.DOWNLOAD_URL.format(reference), verify=False).content
         )
         myzip = zipfile.ZipFile(file_bytes)
         myzip.extractall(static.FUNDS_FOLDER)
@@ -29,9 +30,9 @@ def downloader():
         print("Error downloading", err)
         return False
 
-def load_raw_to_s3():
+def load_raw_to_s3(reference):
     print("Loading raw data to s3")
-    fl_name = static.FILE_NAME.format(2021, "04")
+    fl_name = static.FILE_NAME.format(reference)
     s3_client.upload_file(
         static.FUNDS_FOLDER + "/" + fl_name,
         "dl-landing-zone-401868797180",
@@ -42,9 +43,8 @@ def load_raw_to_s3():
 
 
 
-def transform_data():
-    fl_name = static.FILE_NAME.format(2021, "04")
-    df_cvm = pd.read_csv("cvm-funds/inf_diario_fi_202104.csv", sep=";")
+def transform_data(reference):
+    df_cvm = pd.read_csv(f"cvm-funds/{static.FILE_NAME.format(reference)}", sep=";")
 
     df_cvm["cnpj"] = df_cvm["CNPJ_FUNDO"].str.replace("[./\-]", "", regex=True)
 
@@ -96,7 +96,7 @@ def transform_data():
 
     s3_client.put_object(
         Bucket="dl-processing-zone-401868797180",
-        Key="cvm/processed.csv",
+        Key=f"cvm/processed_{reference}.csv",
         Body=csv_data
     )   
 
@@ -110,6 +110,10 @@ def transform_text(input_string):
     processed_string = unidecode(input_string.upper())
     return processed_string
 
-# downloader()
-# load_raw_to_s3()
-transform_data()
+
+for i in range(1, 9):
+    print(f"Getting ref 20220{i}")
+    ref = f"20220{i}"
+    downloader(ref)
+    load_raw_to_s3(ref)
+    transform_data(ref)
