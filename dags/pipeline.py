@@ -18,9 +18,9 @@ s3_client = boto3.client(
     region_name='us-east-1'
 )
 
+reference = "202208"
 
-
-def downloader(reference):
+def downloader():
     try:
         os.makedirs(static.FUNDS_FOLDER, exist_ok=True)
         file_bytes = BytesIO(
@@ -33,7 +33,7 @@ def downloader(reference):
         print("Error downloading", err)
         return False
 
-def load_raw_to_s3(reference):
+def load_raw_to_s3():
     print("Loading raw data to s3")
     fl_name = static.FILE_NAME.format(reference)
     s3_client.upload_file(
@@ -46,7 +46,7 @@ def load_raw_to_s3(reference):
 
 
 
-def transform_data(reference):
+def transform_data():
     df_cvm = pd.read_csv(f"cvm-funds/{static.FILE_NAME.format(reference)}", sep=";")
 
     df_cvm["cnpj"] = df_cvm["CNPJ_FUNDO"].str.replace("[./\-]", "", regex=True)
@@ -114,7 +114,12 @@ def load_to_dw():
         user="airflow",
         password="airflow",
     )
-    csv_file_path = './files/processed_202208.csv'
+    s3_client.download_file(
+        "dl-processing-zone-401868797180",
+        f"cvm/processed_{reference}.csv",
+        f"./files/processed_{reference}.csv"
+    )
+    csv_file_path = f'./files/processed_{reference}.csv'
 
     insert_query = sql.SQL("""
         INSERT INTO cvm (
@@ -126,12 +131,14 @@ def load_to_dw():
     """)
 
     cursor = conn.cursor()
-
+    count = 0
     with open(csv_file_path, 'r', newline='', encoding='utf-8') as csv_file:
             csv_reader = csv.reader(csv_file)
             next(csv_reader)  # Skip header row
             for row in csv_reader:
-                print(row)
+                count += 1
+                if count > 10:
+                    break
                 cursor.execute(insert_query, row)
             # Commit the changes and close the connection
     conn.commit()
@@ -152,4 +159,4 @@ def transform_text(input_string):
 #     downloader(ref)
 #     load_raw_to_s3(ref)
 #     transform_data(ref)
-load_to_dw()
+# load_to_dw("202208")
