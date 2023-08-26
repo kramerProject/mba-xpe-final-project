@@ -8,3 +8,5 @@ docker-compose.yaml
 ./pgdata
 t.py
 cvm-funds
+config
+logs

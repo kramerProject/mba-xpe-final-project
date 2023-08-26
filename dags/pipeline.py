@@ -11,23 +11,32 @@ from unidecode import unidecode
 import pandas as pd
 import boto3
 
+from airflow.models import Variable
+
 import static
+
+FUNDS_FOLDER = "./cvm-funds"
+REFERENCE = "202105"
+FILE_NAME = "inf_diario_fi_{}.csv"
+DOWNLOAD_URL = "https://dados.cvm.gov.br/dados/FI/DOC/INF_DIARIO/DADOS/inf_diario_fi_{}.zip"
 
 s3_client = boto3.client(
     's3',
-    region_name='us-east-1'
+    region_name='us-east-1',
+    aws_access_key_id=Variable.get("AWS_ACCESS_KEY_ID"),
+    aws_secret_access_key=Variable.get("AWS_SECRET_ACCESS_KEY")
 )
 
 reference = "202208"
 
 def downloader():
     try:
-        os.makedirs(static.FUNDS_FOLDER, exist_ok=True)
+        os.makedirs(FUNDS_FOLDER, exist_ok=True)
         file_bytes = BytesIO(
-            requests.get(static.DOWNLOAD_URL.format(reference), verify=False).content
+            requests.get(DOWNLOAD_URL.format(reference), verify=False).content
         )
         myzip = zipfile.ZipFile(file_bytes)
-        myzip.extractall(static.FUNDS_FOLDER)
+        myzip.extractall(FUNDS_FOLDER)
         return True
     except Exception as err:
         print("Error downloading", err)
@@ -35,9 +44,9 @@ def downloader():
 
 def load_raw_to_s3():
     print("Loading raw data to s3")
-    fl_name = static.FILE_NAME.format(reference)
+    fl_name = FILE_NAME.format(reference)
     s3_client.upload_file(
-        static.FUNDS_FOLDER + "/" + fl_name,
+        FUNDS_FOLDER + "/" + fl_name,
         "dl-landing-zone-401868797180",
         f"cvm/raw-data/{fl_name}"
     )
@@ -47,7 +56,7 @@ def load_raw_to_s3():
 
 
 def transform_data():
-    df_cvm = pd.read_csv(f"cvm-funds/{static.FILE_NAME.format(reference)}", sep=";")
+    df_cvm = pd.read_csv(f"cvm-funds/{FILE_NAME.format(reference)}", sep=";")
 
     df_cvm["cnpj"] = df_cvm["CNPJ_FUNDO"].str.replace("[./\-]", "", regex=True)
 
@@ -109,7 +118,7 @@ def transform_data():
 def load_to_dw():
     print("Load to dw")
     conn = psycopg2.connect(
-        host="localhost",
+        host="postgres",
         database="airflow",
         user="airflow",
         password="airflow",
