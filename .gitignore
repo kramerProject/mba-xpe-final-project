@@ -3,8 +3,6 @@
 variables.json
 *__pycache__
 kill.sh
-Dockerfile
-docker-compose.yaml
 ./pgdata
 t.py
 cvm-funds

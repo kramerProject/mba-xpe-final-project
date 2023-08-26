@@ -60,7 +60,7 @@ def transform_data():
 
     df_cvm["cnpj"] = df_cvm["CNPJ_FUNDO"].str.replace("[./\-]", "", regex=True)
 
-    df_funds_xp = pd.read_csv("files/base_funds.csv", sep=";")
+    df_funds_xp = pd.read_csv("data/base_funds.csv", sep=";")
 
     df_funds_xp = df_funds_xp[['cnpj', 'nm_fundo', 'classif_cvm']]
 
