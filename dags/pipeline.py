@@ -3,38 +3,50 @@ import zipfile
 import requests
 from io import BytesIO
 import os
+import csv
+import psycopg2
+from psycopg2 import sql
 
 from unidecode import unidecode
 import pandas as pd
 import boto3
 
+from airflow.models import Variable
+
 import static
+
+FUNDS_FOLDER = "./cvm-funds"
+REFERENCE = "202105"
+FILE_NAME = "inf_diario_fi_{}.csv"
+DOWNLOAD_URL = "https://dados.cvm.gov.br/dados/FI/DOC/INF_DIARIO/DADOS/inf_diario_fi_{}.zip"
 
 s3_client = boto3.client(
     's3',
-    region_name='us-east-1'
+    region_name='us-east-1',
+    aws_access_key_id=Variable.get("AWS_ACCESS_KEY_ID"),
+    aws_secret_access_key=Variable.get("AWS_SECRET_ACCESS_KEY")
 )
 
+reference = "202208"
 
-
-def downloader(reference):
+def downloader():
     try:
-        os.makedirs(static.FUNDS_FOLDER, exist_ok=True)
+        os.makedirs(FUNDS_FOLDER, exist_ok=True)
         file_bytes = BytesIO(
-            requests.get(static.DOWNLOAD_URL.format(reference), verify=False).content
+            requests.get(DOWNLOAD_URL.format(reference), verify=False).content
         )
         myzip = zipfile.ZipFile(file_bytes)
-        myzip.extractall(static.FUNDS_FOLDER)
+        myzip.extractall(FUNDS_FOLDER)
         return True
     except Exception as err:
         print("Error downloading", err)
         return False
 
-def load_raw_to_s3(reference):
+def load_raw_to_s3():
     print("Loading raw data to s3")
-    fl_name = static.FILE_NAME.format(reference)
+    fl_name = FILE_NAME.format(reference)
     s3_client.upload_file(
-        static.FUNDS_FOLDER + "/" + fl_name,
+        FUNDS_FOLDER + "/" + fl_name,
         "dl-landing-zone-401868797180",
         f"cvm/raw-data/{fl_name}"
     )
@@ -43,12 +55,12 @@ def load_raw_to_s3(reference):
 
 
 
-def transform_data(reference):
-    df_cvm = pd.read_csv(f"cvm-funds/{static.FILE_NAME.format(reference)}", sep=";")
+def transform_data():
+    df_cvm = pd.read_csv(f"cvm-funds/{FILE_NAME.format(reference)}", sep=";")
 
     df_cvm["cnpj"] = df_cvm["CNPJ_FUNDO"].str.replace("[./\-]", "", regex=True)
 
-    df_funds_xp = pd.read_csv("files/base_funds.csv", sep=";")
+    df_funds_xp = pd.read_csv("data/base_funds.csv", sep=";")
 
     df_funds_xp = df_funds_xp[['cnpj', 'nm_fundo', 'classif_cvm']]
 
@@ -103,6 +115,45 @@ def transform_data(reference):
     return True
 
 
+def load_to_dw():
+    print("Load to dw")
+    conn = psycopg2.connect(
+        host="postgres",
+        database="airflow",
+        user="airflow",
+        password="airflow",
+    )
+    s3_client.download_file(
+        "dl-processing-zone-401868797180",
+        f"cvm/processed_{reference}.csv",
+        f"processed_{reference}.csv"
+    )
+    csv_file_path = f'processed_{reference}.csv'
+
+    insert_query = sql.SQL("""
+        INSERT INTO cvm (
+            cnpj, nm_fundo, classificacao_cvm, dt_comptc,
+            vl_total, vl_cota, vl_pl_liq, captc_dia, resg_dia, nr_cotst
+        ) VALUES (
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+        )
+    """)
+
+    cursor = conn.cursor()
+    count = 0
+    with open(csv_file_path, 'r', newline='', encoding='utf-8') as csv_file:
+            csv_reader = csv.reader(csv_file)
+            next(csv_reader)  # Skip header row
+            for row in csv_reader:
+                count += 1
+                if count > 10:
+                    break
+                cursor.execute(insert_query, row)
+            # Commit the changes and close the connection
+    conn.commit()
+    cursor.close()
+    conn.close()
+    print("Data loaded successfully.")
 
 
 def transform_text(input_string):
@@ -111,9 +162,10 @@ def transform_text(input_string):
     return processed_string
 
 
-for i in range(1, 9):
-    print(f"Getting ref 20220{i}")
-    ref = f"20220{i}"
-    downloader(ref)
-    load_raw_to_s3(ref)
-    transform_data(ref)
+# for i in range(1, 9):
+#     print(f"Getting ref 20220{i}")
+#     ref = f"20220{i}"
+#     downloader(ref)
+#     load_raw_to_s3(ref)
+#     transform_data(ref)
+# load_to_dw("202208")
