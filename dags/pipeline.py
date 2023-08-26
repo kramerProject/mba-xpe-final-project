@@ -3,6 +3,9 @@ import zipfile
 import requests
 from io import BytesIO
 import os
+import csv
+import psycopg2
+from psycopg2 import sql
 
 from unidecode import unidecode
 import pandas as pd
@@ -103,6 +106,38 @@ def transform_data(reference):
     return True
 
 
+def load_to_dw():
+    print("Load to dw")
+    conn = psycopg2.connect(
+        host="localhost",
+        database="airflow",
+        user="airflow",
+        password="airflow",
+    )
+    csv_file_path = './files/processed_202208.csv'
+
+    insert_query = sql.SQL("""
+        INSERT INTO cvm (
+            cnpj, nm_fundo, classificacao_cvm, dt_comptc,
+            vl_total, vl_cota, vl_pl_liq, captc_dia, resg_dia, nr_cotst
+        ) VALUES (
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+        )
+    """)
+
+    cursor = conn.cursor()
+
+    with open(csv_file_path, 'r', newline='', encoding='utf-8') as csv_file:
+            csv_reader = csv.reader(csv_file)
+            next(csv_reader)  # Skip header row
+            for row in csv_reader:
+                print(row)
+                cursor.execute(insert_query, row)
+            # Commit the changes and close the connection
+    conn.commit()
+    cursor.close()
+    conn.close()
+    print("Data loaded successfully.")
 
 
 def transform_text(input_string):
@@ -111,9 +146,10 @@ def transform_text(input_string):
     return processed_string
 
 
-for i in range(1, 9):
-    print(f"Getting ref 20220{i}")
-    ref = f"20220{i}"
-    downloader(ref)
-    load_raw_to_s3(ref)
-    transform_data(ref)
+# for i in range(1, 9):
+#     print(f"Getting ref 20220{i}")
+#     ref = f"20220{i}"
+#     downloader(ref)
+#     load_raw_to_s3(ref)
+#     transform_data(ref)
+load_to_dw()
