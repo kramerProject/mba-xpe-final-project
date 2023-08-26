@@ -126,9 +126,9 @@ def load_to_dw():
     s3_client.download_file(
         "dl-processing-zone-401868797180",
         f"cvm/processed_{reference}.csv",
-        f"./files/processed_{reference}.csv"
+        f"./data/processed_{reference}.csv"
     )
-    csv_file_path = f'./files/processed_{reference}.csv'
+    csv_file_path = f'./data/processed_{reference}.csv'
 
     insert_query = sql.SQL("""
         INSERT INTO cvm (
