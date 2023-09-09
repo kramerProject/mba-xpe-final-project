@@ -1,7 +1,7 @@
 ## Description
 
 This project is part of the MBA in Data Engineering from XPE. The job consists in extracting investment funds information from 
-[CVM](https://dados.cvm.gov.br/dataset/fi-doc-inf_diario). All raw Data is storaged in an AWS bucket, then transformed and finally saved in postgres SQL data base. The pipeline is entirely orchestrated using AIRFLOW.
+[CVM](https://dados.cvm.gov.br/dataset/fi-doc-inf_diario). All raw Data is storaged in an AWS bucket, after transformation is finally storaged in a postgreSQL data base. The pipeline is entirely orchestrated using AIRFLOW.
 
 ## About the source
 
@@ -19,7 +19,7 @@ ensuring wide dissemination of information about issuers and their values furnit
 
 ## Inputs
 
-Should define YEAR and Month reference you wish to collect
+Should define YEAR and MONTH reference you wish to collect using the string format bellow
 
 ```
 reference = "YYYYMM"
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS cvm (
 - [X] Developed a crawler to scrape the source
 - [X] Use AIRFLOW to orchestrate the whole process
 - [X] Create an image for the pipeline
-- [X] Use postgres to load the data
+- [X] Use postgresql to load the data
 
 
 ## How to run
@@ -84,5 +84,4 @@ Use the file variables_template.json as a model
 
 ## Next steps
 
-- [] 
-- [] Use kubernetes to deploy the solution
+- Use kubernetes to deploy the solution
