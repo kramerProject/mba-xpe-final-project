@@ -11,7 +11,7 @@ from unidecode import unidecode
 import pandas as pd
 import boto3
 
-from airflow.models import Variable
+# from airflow.models import Variable
 
 import static
 
@@ -20,14 +20,21 @@ REFERENCE = "202105"
 FILE_NAME = "inf_diario_fi_{}.csv"
 DOWNLOAD_URL = "https://dados.cvm.gov.br/dados/FI/DOC/INF_DIARIO/DADOS/inf_diario_fi_{}.zip"
 
+# s3_client = boto3.client(
+#     's3',
+#     region_name='us-east-1',
+#     aws_access_key_id=Variable.get("AWS_ACCESS_KEY_ID"),
+#     aws_secret_access_key=Variable.get("AWS_SECRET_ACCESS_KEY")
+# )
+
 s3_client = boto3.client(
     's3',
     region_name='us-east-1',
-    aws_access_key_id=Variable.get("AWS_ACCESS_KEY_ID"),
-    aws_secret_access_key=Variable.get("AWS_SECRET_ACCESS_KEY")
+    aws_access_key_id="AKIAV3EJ7GT6MSO7WR53",
+    aws_secret_access_key="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"
 )
 
-reference = "202208"
+reference = "202309"
 
 def downloader():
     try:
@@ -55,16 +62,8 @@ def load_raw_to_s3():
 
 
 
-def transform_data():
-    df_cvm = pd.read_csv(f"cvm-funds/{FILE_NAME.format(reference)}", sep=";")
-
-    df_cvm["cnpj"] = df_cvm["CNPJ_FUNDO"].str.replace("[./\-]", "", regex=True)
-
-    df_funds_xp = pd.read_csv("data/base_funds.csv", sep=";")
-
-    df_funds_xp = df_funds_xp[['cnpj', 'nm_fundo', 'classif_cvm']]
-
-
+def _preprocess_data(df_funds):
+    df_funds_xp = df_funds[['cnpj', 'nm_fundo', 'classif_cvm']]
     df_funds_xp["cnpj_treated"] = df_funds_xp["cnpj"].astype(str).str.zfill(14)
     df_funds_xp["nm_fundo_treated"] = df_funds_xp['nm_fundo'].apply(transform_text)
     df_funds_xp["classif_cvm_treated"] = df_funds_xp['classif_cvm'].apply(transform_text)
@@ -73,9 +72,28 @@ def transform_data():
 
     new_column_names = {'cnpj_treated': 'cnpj', 'nm_fundo_treated': 'nm_fundo', 'classif_cvm_treated': 'classificacao_cvm'}
     df_funds_xp.rename(columns=new_column_names, inplace=True)
+
+    return df_funds_xp
+
+def transform_data():
+    # read cvm
+    df_cvm = pd.read_csv(f"cvm-funds/{FILE_NAME.format(reference)}", sep=";")
+    df_funds_xp = pd.read_csv("data/base_funds.csv", sep=";")
+
+    if df_cvm is None or df_funds_xp is None:
+        return False
+
+
+    # Preprocess data
+    df_cvm["cnpj"] = df_cvm["CNPJ_FUNDO"].str.replace("[./\-]", "", regex=True)
+
+    df_funds_xp = _preprocess_data(df_funds_xp)
+
     
+     # Merge data
     df_joined = pd.merge(df_cvm, df_funds_xp, on='cnpj', how='left')
 
+    # Drop NaN values
     df_final = df_joined.dropna()
 
     df_final = df_final[
@@ -162,6 +180,9 @@ def transform_text(input_string):
     return processed_string
 
 
+
+
+
 # for i in range(1, 9):
 #     print(f"Getting ref 20220{i}")
 #     ref = f"20220{i}"
@@ -169,3 +190,5 @@ def transform_text(input_string):
 #     load_raw_to_s3(ref)
 #     transform_data(ref)
 # load_to_dw("202208")
+# downloader()
+transform_data()
