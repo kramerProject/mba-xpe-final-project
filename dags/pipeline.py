@@ -11,7 +11,7 @@ from unidecode import unidecode
 import pandas as pd
 import boto3
 
-# from airflow.models import Variable
+from airflow.models import Variable
 
 import static
 
@@ -20,19 +20,14 @@ REFERENCE = "202105"
 FILE_NAME = "inf_diario_fi_{}.csv"
 DOWNLOAD_URL = "https://dados.cvm.gov.br/dados/FI/DOC/INF_DIARIO/DADOS/inf_diario_fi_{}.zip"
 
-# s3_client = boto3.client(
-#     's3',
-#     region_name='us-east-1',
-#     aws_access_key_id=Variable.get("AWS_ACCESS_KEY_ID"),
-#     aws_secret_access_key=Variable.get("AWS_SECRET_ACCESS_KEY")
-# )
-
 s3_client = boto3.client(
     's3',
     region_name='us-east-1',
-    aws_access_key_id="AKIAV3EJ7GT6MSO7WR53",
-    aws_secret_access_key="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"
+    aws_access_key_id=Variable.get("AWS_ACCESS_KEY_ID"),
+    aws_secret_access_key=Variable.get("AWS_SECRET_ACCESS_KEY")
 )
+
+
 
 reference = "202309"
 
